@@ -1,0 +1,1 @@
+Lab ZTP - OpenShift 4.18
