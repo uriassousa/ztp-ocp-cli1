@@ -1,0 +1,189 @@
+apiVersion: ran.openshift.io/v1
+kind: SiteConfig
+metadata:
+  name: ocp-cli1
+  namespace: assisted-installer
+spec:
+  baseDomain: znero.local
+  pullSecretRef:
+    name: pull-secret
+  clusterImageSetNameRef:
+    name: openshift-4.18
+  sshPublicKey: "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDPBEnWsVMJ7vlPMU+6ulYD0Mwzzb9IF8xFdd7v/OZ70/2GuHj71wGx7QsUvYW/W3VHBfOC/IZodGCVt8WlUkP7iacI1ykbskM8gdglE6I4zFV4rKK7HLFCFXhLScpHODhVIbilcHEULAmMnDxv1g40jiwYKjal0jdB2TAUX9VwAB4qmO9sWRDnHZnu5R473IcvS3TuJhrU0t1Gb8/73iU9UZnun76ZROreTtFt5XsPttTIEEyyqKtgHFliZW74qU2NJQySWrnvOJfpDHmHAmN0PaAEjgv9LRDugtn+J5OEG42GEaiXD3EUEvbewo1jlkx209c/XeqM5b+UbiSMHtMJOMhet82MY6JSPqtR8cuVo6dtF/P32mbvzFefFTitYWJW7JtJM/ZVUC7bbo/60514aX3oGpfywLJwC+On5eYVNsWtbNxXfvCFZZwU87sztSTDpYp/E8I6XOzFz03+FjpFNAFB8B6/aTQyp56iMWpMZprCI2C1RYLIlp1o9RuVvZCD0245hucolGknFdoCHmLPFPI504g26jwagyQ/f6JPzYSYpTPip5HSZSagUxe8KA8VnMqX8DzDAvqXbZ0vr0fv5Ln1XLlXrJUmElG69wu/HFmvPsz4ge7NThfLqcK939CuvSbQ2M5pyeeiJC2KcDz6mMFasUnIdESigHTwxv+6FQ== uriassousa@Uriass-Mac-mini.local" # Mantenha sua chave completa aqui
+
+  clusters:
+  - clusterName: ocp-cli1
+    networkType: OVNKubernetes
+
+    clusterLabels:
+      group-du-sno: ""
+      common: true
+
+    clusterNetwork:
+    - cidr: 10.128.0.0/14
+      hostPrefix: 23
+    serviceNetwork:
+    - 172.30.0.0/16
+    machineNetwork:
+    - cidr: 192.168.31.0/24
+    # Início da configuração dos Nós
+    nodes:
+    # -----------------------------------------------------------------
+    # NODE 1 - MASTER 0
+    # -----------------------------------------------------------------
+    - hostName: master-0.ocp-cli1.znero.local
+      role: master
+      bmcAddress: ipmi://192.168.31.82:6231
+      bmcCredentialsName:
+        name: bmh-secret
+      # O Boot deve ser feito pela placa principal
+      bootMACAddress: "00:50:56:b3:82:6e"
+      bootMode: UEFI
+      nodeNetwork:
+        interfaces:
+        - name: uplink1 # Nome lógico que vamos dar (ignora se é ens192/ens224)
+          macAddress: "00:50:56:b3:82:6e" # MAC 1 (Existente)
+        - name: uplink2
+          macAddress: "00:50:56:b3:41:59"
+        config:
+          interfaces:
+          # Define a Interface Física 1 (Slave)
+          - name: uplink1
+            type: ethernet
+            state: up
+            mac-address: "00:50:56:b3:82:6e"
+
+          # Define a Interface Física 2 (Slave)
+          - name: uplink2
+            type: ethernet
+            state: up
+            mac-address: "00:50:56:b3:41:59" #
+
+          # Define o BOND (Master)
+          - name: bond0
+            type: bond
+            state: up
+            link-aggregation:
+              mode: active-backup # Modo solicitado
+              port:
+              - uplink1
+              - uplink2
+            ipv4:
+              enabled: true
+              dhcp: false
+              address:
+              - ip: 192.168.31.85
+                prefix-length: 24
+            # Define que a rota padrão sai pelo Bond
+          dns-resolver:
+            config:
+              server:
+              - 192.168.31.64
+          routes:
+            config:
+            - destination: 0.0.0.0/0
+              next-hop-address: 192.168.31.1
+              next-hop-interface: bond0 # Rota aponta para o Bond
+              table-id: 254
+
+    # -----------------------------------------------------------------
+    # NODE 2 - MASTER 1
+    # -----------------------------------------------------------------
+    - hostName: master-1.ocp-cli1.znero.local
+      role: master
+      bmcAddress: ipmi://192.168.31.82:6232
+      bmcCredentialsName:
+        name: bmh-secret
+      bootMACAddress: "00:50:56:b3:02:17"
+      bootMode: UEFI
+      nodeNetwork:
+        interfaces:
+        - name: uplink1
+          macAddress: "00:50:56:b3:02:17"
+        - name: uplink2
+          macAddress: "00:50:56:b3:67:67"
+        config:
+          interfaces:
+          - name: uplink1
+            type: ethernet
+            state: up
+            mac-address: "00:50:56:b3:02:17"
+          - name: uplink2
+            type: ethernet
+            state: up
+            mac-address: "00:50:56:b3:67:67"
+          - name: bond0
+            type: bond
+            state: up
+            link-aggregation:
+              mode: active-backup
+              port:
+              - uplink1
+              - uplink2
+            ipv4:
+              enabled: true
+              dhcp: false
+              address:
+              - ip: 192.168.31.86
+                prefix-length: 24
+          dns-resolver:
+            config:
+              server:
+              - 192.168.31.64
+          routes:
+            config:
+            - destination: 0.0.0.0/0
+              next-hop-address: 192.168.31.1
+              next-hop-interface: bond0
+              table-id: 254
+
+    # -----------------------------------------------------------------
+    # NODE 3 - MASTER 2
+    # -----------------------------------------------------------------
+    - hostName: master-2.ocp-cli1.znero.local
+      role: master
+      bmcAddress: ipmi://192.168.31.82:6233
+      bmcCredentialsName:
+        name: bmh-secret
+      bootMACAddress: "00:50:56:b3:ab:b8"
+      bootMode: UEFI
+      nodeNetwork:
+        interfaces:
+        - name: uplink1
+          macAddress: "00:50:56:b3:ab:b8"
+        - name: uplink2
+          macAddress: "00:50:56:b3:37:0b"
+        config:
+          interfaces:
+          - name: uplink1
+            type: ethernet
+            state: up
+            mac-address: "00:50:56:b3:ab:b8"
+          - name: uplink2
+            type: ethernet
+            state: up
+            mac-address: "00:50:56:b3:37:0b"
+          - name: bond0
+            type: bond
+            state: up
+            link-aggregation:
+              mode: active-backup
+              port:
+              - uplink1
+              - uplink2
+            ipv4:
+              enabled: true
+              dhcp: false
+              address:
+              - ip: 192.168.31.87
+                prefix-length: 24
+          dns-resolver:
+            config:
+              server:
+              - 192.168.31.64
+          routes:
+            config:
+            - destination: 0.0.0.0/0
+              next-hop-address: 192.168.31.1
+              next-hop-interface: bond0
+              table-id: 254
